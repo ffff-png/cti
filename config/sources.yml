@@ -1,0 +1,19 @@
+defaults:
+  max_failures: 3      # échecs consécutifs avant suspension
+  cooldown: 60s        # durée de suspension
+
+sources:
+  - id: fake
+    type: fake
+    every: 20s
+    enabled: true
+    params:
+      count: 5
+      seed: null       # null = données différentes à chaque collecte
+
+  - id: fail-demo
+    type: failing
+    every: 10s
+    cooldown: 40s      # remplace la valeur par défaut, pour la démonstration
+    enabled: true
+    params: {}
