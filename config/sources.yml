@@ -3,17 +3,30 @@ defaults:
   cooldown: 60s        # durée de suspension
 
 sources:
+  - id: otx
+    type: otx
+    every: 30m
+    enabled: true
+    params:
+      api_key_env: OTX_API_KEY   # la clé est dans .env, jamais dans ce fichier
+      initial_days: 7            # profondeur de la première collecte
+      page_size: 50
+      max_pages: 5
+
+  
+
+  # sources de démonstration, désactivées pour ne pas polluer le dashboard
   - id: fake
     type: fake
     every: 20s
-    enabled: true
+    enabled: false
     params:
       count: 5
-      seed: null       # null = données différentes à chaque collecte
+      seed: null
 
   - id: fail-demo
     type: failing
     every: 10s
-    cooldown: 40s      # remplace la valeur par défaut, pour la démonstration
-    enabled: true
+    cooldown: 40s
+    enabled: false
     params: {}
