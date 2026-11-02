@@ -1,0 +1,15 @@
+apscheduler
+beautifulsoup4
+confluent-kafka
+prometheus-client
+pydantic
+pysocks
+pyyaml
+redis
+requests
+simhash
+stix2
+selenium>=4.15.0
+webdriver-manager>=4.0.0
+fake-useragent>=1.4.0
+beautifulsoup4>=4.12.0

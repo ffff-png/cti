@@ -3,19 +3,123 @@ defaults:
   cooldown: 60s        # durée de suspension
 
 sources:
+  # --- 1. AlienVault OTX ---
   - id: otx
     type: otx
     every: 30m
     enabled: true
     params:
-      api_key_env: OTX_API_KEY   # la clé est dans .env, jamais dans ce fichier
-      initial_days: 7            # profondeur de la première collecte
+      api_key_env: OTX_API_KEY
+      initial_days: 7
       page_size: 50
       max_pages: 5
 
-  
+  # --- 2. Abuse.ch (ThreatFox) ---
+  - id: threatfox
+    type: threatfox
+    every: 30m
+    enabled: false
+    params:
+      api_key_env: ABUSECH_AUTH_KEY
+      initial_days: 1
+      min_confidence: 0
 
-  # sources de démonstration, désactivées pour ne pas polluer le dashboard
+  # --- 3. Abuse.ch (URLhaus) ---
+  - id: urlhaus
+    type: urlhaus
+    every: 30m
+    enabled: false
+    params:
+      api_key_env: ABUSECH_AUTH_KEY
+      limit: 1000
+      only_online: false
+
+  # --- 4. MISP ---
+  - id: misp
+    type: misp
+    every: 30m
+    enabled: false
+    params:
+      base_url: http://127.0.0.1:8081
+      api_key_env: MISP_API_KEY
+      to_ids_only: true
+      enforce_warninglist: true
+      published_only: true
+      initial_days: 7
+      limit: 1000
+      max_pages: 10
+
+  # --- 5. Site spécialisé (Démo) ---
+  - id: demo-site
+    type: site
+    every: 5m
+    enabled: false
+    max_failures: 2
+    cooldown: 30m
+    params:
+      base_url: http://127.0.0.1:8080
+      list_url: /
+      item_selector: a.title
+      next_selector: a.next
+      content_selector: div.article-body
+      title_selector: h1
+      ioc_selector: pre.iocs
+      max_pages: 3
+      max_articles: 30
+      delay: [1.5, 4.0]
+      respect_robots: true
+      ignore_domains: []
+      auth:
+        type: form
+        login_url: /login
+        username_env: DEMO_SITE_USER
+        password_env: DEMO_SITE_PASS
+        success_selector: a.logout
+
+  # --- 6. Dark Web via Tor ---
+  - id: darkweb
+    type: onion
+    every: 1h
+    enabled: false
+    max_failures: 2
+    cooldown: 30m
+    params:
+      socks: 127.0.0.1:9050
+      control: 127.0.0.1:9051
+      control_password_env: TOR_CONTROL_PASSWORD
+      verify_tor: true
+      rotate_every: 5
+      delay: [8, 25]
+      max_bytes: 1000000
+      ignore_domains: []
+      targets: []
+
+  # --- 7. NOUVEAU : Collecteur X (Twitter) ---
+  - id: x
+    type: x
+    every: 1h              # Fréquence de collecte (1 heure)
+    enabled: true        # Mettre à 'true' une fois le fichier accounts.db créé
+    max_failures: 3
+    cooldown: 60m
+    params:
+      accounts_db: data/x_accounts.db  # Chemin vers la base de données twscrape
+      max_posts: 50                    # Nombre max de posts par requête de collecte
+      keywords:
+        - ransomware
+        - malware
+        - phishing
+        - cyberattack
+        - data breach
+        - zero-day
+        - CVE-
+      profiles:
+        - CISAgov
+        - NCSC
+        - mandiant
+        - CrowdStrike
+        - TheHackerNews
+
+  # --- 8. Collecteurs de test ---
   - id: fake
     type: fake
     every: 20s

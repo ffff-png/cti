@@ -8,10 +8,13 @@ import requests
 
 from core.collector import Collector, HealthState, HealthStatus, RawRecord
 from core.schema import SourceType
+from core.state import StateStore
 
 API_URL = "https://otx.alienvault.com/api/v1/pulses/subscribed"
 DOMAIN_OK = re.compile(r"^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$")
-SUPPORTED = {"IPv4", "IPv6", "domain", "hostname"}   # types gérés par le normalisateur
+HASH_LEN = {"FileHash-MD5": 32, "FileHash-SHA1": 40, "FileHash-SHA256": 64}
+HEX = re.compile(r"^[a-f0-9]+$")
+SUPPORTED = {"IPv4", "IPv6", "domain", "hostname", "URL", *HASH_LEN}   # types gérés par le normalisateur
 
 
 class OTXCollector(Collector):
@@ -30,7 +33,10 @@ class OTXCollector(Collector):
         self.max_pages = int(config.get("max_pages", 5))
         self.initial_days = float(config.get("initial_days", 7))
         self.key_env = config.get("api_key_env", "OTX_API_KEY")
-        self._since: datetime | None = None      # curseur : dernière collecte réussie
+        # l'orchestrateur recrée le collecteur à chaque collecte : le curseur est sur disque
+        self._store = StateStore(self.source_id)
+        saved = self._store.load().get("since")
+        self._since: datetime | None = datetime.fromisoformat(saved) if saved else None
         self._stopped = False
         self._failed = False
         self._emitted = 0
@@ -46,12 +52,17 @@ class OTXCollector(Collector):
 
     @staticmethod
     def _clean(indicator: str, itype: str) -> str | None:
-        indicator = indicator.strip().lower()
+        raw_value = indicator.strip()
+        indicator = raw_value if itype == "URL" else raw_value.lower()
         try:
             if itype in ("IPv4", "IPv6"):
                 return str(ipaddress.ip_address(indicator))
         except ValueError:
             return None
+        if itype in HASH_LEN:
+            return indicator if len(indicator) == HASH_LEN[itype] and HEX.match(indicator) else None
+        if itype == "URL":
+            return indicator if re.match(r"^https?://[^\s'\"<>]+$", indicator) else None
         return indicator if DOMAIN_OK.match(indicator) else None
 
     def collect(self) -> Iterator[RawRecord]:
@@ -80,6 +91,7 @@ class OTXCollector(Collector):
             self._failed = True
             raise
         self._since = started                              # avancer le curseur seulement en cas de succès
+        self._store.save({"since": started.isoformat()})
 
     def _records(self, pulse: dict) -> Iterator[RawRecord]:
         meta_pulse = {
@@ -113,7 +125,7 @@ class OTXCollector(Collector):
             return HealthStatus(HealthState.DOWN, "API OTX inaccessible ou clé invalide")
         if self._skipped:
             return HealthStatus(HealthState.DEGRADED,
-                                f"{self._emitted} émis, {self._skipped} indicateurs non gérés (URL/hash...)")
+                                f"{self._emitted} émis, {self._skipped} indicateurs ignorés (type non géré ou invalide)")
         return HealthStatus(HealthState.OK, f"{self._emitted} indicateurs émis")
 
     def stop(self) -> None:

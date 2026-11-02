@@ -1,0 +1,14 @@
+DataDirectory /var/lib/tor
+# SOCKS : un circuit distinct par identité (nom d'utilisateur SOCKS) et par protocole
+SocksPort 0.0.0.0:9050 IsolateSOCKSAuth IsolateClientProtocol
+SocksPolicy accept 10.0.0.0/8
+SocksPolicy accept 172.16.0.0/12
+SocksPolicy accept 192.168.0.0/16
+SocksPolicy reject *
+# Contrôle : demandes de nouveaux circuits (protégé par mot de passe, publié sur 127.0.0.1 seulement)
+ControlPort 0.0.0.0:9051
+ClientOnly 1
+SafeSocks 1              # refuse les connexions SOCKS qui trahiraient une résolution DNS locale
+ClientUseIPv6 0
+AvoidDiskWrites 1
+Log notice stdout

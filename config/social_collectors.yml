@@ -1,0 +1,12 @@
+x:
+  enabled: true
+  accounts_db: "accounts.db"  # ← Pointe vers la DB créée par twscrape
+  keywords:
+    - "ransomware"
+    - "cyberattack"
+  max_posts: 5  # ← Petit nombre pour tester rapidement
+  delay_min: 1.0
+  delay_max: 2.0
+
+facebook:
+  enabled: false  # ← On se concentre sur X pour l'instant

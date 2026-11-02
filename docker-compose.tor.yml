@@ -1,0 +1,29 @@
+# Service Tor, optionnel (profil « tor »). Démarré par start.sh si TOR_ENABLED=1 dans .env.
+# Utilisation manuelle : docker compose -f docker-compose.yml -f docker-compose.tor.yml --profile tor up -d
+services:
+  tor:
+    profiles: ["tor"]
+    build: ./docker/tor
+    container_name: cti-tor
+    ports:
+      - "127.0.0.1:9050:9050"        # SOCKS : accessible depuis cette machine uniquement
+      - "127.0.0.1:9051:9051"        # contrôle (rotation des circuits)
+    environment:
+      - TOR_CONTROL_PASSWORD=${TOR_CONTROL_PASSWORD}
+      - TOR_UPSTREAM_SOCKS5=${TOR_UPSTREAM_SOCKS5:-}
+    # volumes: ["./docker/tor/bridges.conf:/etc/tor/bridges.conf:ro"]   # décommenter pour des ponts
+    volumes:
+      - tor_data:/var/lib/tor
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 9050"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  tor_data:

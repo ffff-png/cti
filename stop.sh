@@ -7,5 +7,7 @@ for svc in orchestrator normalizer deduplicator; do
     rm -f ".pids/$svc.pid"
   fi
 done
-docker compose stop
+COMPOSE="docker compose -f docker-compose.yml"
+[ -f docker-compose.tor.yml ] && COMPOSE="$COMPOSE -f docker-compose.tor.yml"
+COMPOSE_PROFILES=tor $COMPOSE stop
 echo "Tout est arrêté. Relancez avec ./start.sh"

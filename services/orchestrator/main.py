@@ -187,7 +187,11 @@ def main():
 
     orch = Orchestrator(load_config(args.config), KafkaPublisher(args.bootstrap))
     scheduler = orch.start()
-    print(f"Orchestrateur démarré : {len(orch.sources)} source(s). Ctrl+C pour arrêter.\n")
+    print("\n--- TÂCHES PLANIFIÉES ---")
+     
+    for job in scheduler.get_jobs():
+        print(f"ID={job.id} | prochaine exécution={job.next_run_time}")
+    print(f"Orchestrateur démarré : {len(orch.sources)} source(s). Ctrl+C pour arrêter. \n")
 
     t0 = time.time()
     try:

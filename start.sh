@@ -14,9 +14,23 @@ source .venv/bin/activate
 # Variables secrètes (clé OTX, etc.) exportées pour les services Python
 set -a; [ -f .env ] && source .env; set +a
 
-# 2. Docker : Kafka, Redis, Prometheus, Grafana
+# Tor (optionnel) : TOR_ENABLED=1 dans .env pour démarrer le conteneur Tor
+COMPOSE="docker compose -f docker-compose.yml"
+[ -f docker-compose.tor.yml ] && COMPOSE="$COMPOSE -f docker-compose.tor.yml"
+if [ "${TOR_ENABLED:-0}" = "1" ]; then
+  if ! grep -q '^TOR_CONTROL_PASSWORD=.' .env 2>/dev/null; then
+    echo "TOR_CONTROL_PASSWORD=$(openssl rand -hex 16)" >> .env     # mot de passe généré une seule fois
+    set -a; source .env; set +a
+  fi
+  export COMPOSE_PROFILES=tor
+  if [ ! -f docker-compose.tor.yml ]; then
+    echo "[!] TOR_ENABLED=1 mais docker-compose.tor.yml est introuvable : Tor ne sera PAS démarré."
+  fi
+fi
+
+# 2. Docker : Kafka, Redis, Prometheus, Grafana (+ Tor)
 echo "[1/4] Démarrage de Docker..."
-docker compose up -d || { echo "[!] docker compose a échoué (Docker est-il lancé ?)"; exit 1; }
+$COMPOSE up -d || { echo "[!] docker compose a échoué (Docker est-il lancé ?)"; exit 1; }
 
 # 3. Attendre que Kafka réponde
 echo "[2/4] Attente de Kafka..."
@@ -29,7 +43,7 @@ done
 
 # 4. Topics (sans effet s'ils existent déjà)
 echo "[3/4] Vérification des topics..."
-for t in cti.pivot cti.normalized cti.near_duplicates ops.metrics dlq.normalizer dlq.deduplicator; do
+for t in raw.x cti.pivot cti.normalized cti.near_duplicates ops.metrics dlq.normalizer dlq.deduplicator; do
   docker exec cti-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 \
     --create --if-not-exists --topic "$t" --partitions 3 --replication-factor 1 >/dev/null
 done

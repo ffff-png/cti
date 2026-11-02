@@ -18,6 +18,13 @@ DLQ_TOPIC = "dlq.normalizer"
 
 IP_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 DOMAIN_RE = re.compile(r"\b(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}\b", re.I)
+URL_RE = re.compile(r"\bhttps?://[^\s'\"<>]+", re.I)
+HASH_RES = (                                   # du plus long au plus court
+    ("file-sha256", re.compile(r"\b[a-f0-9]{64}\b", re.I)),
+    ("file-sha1", re.compile(r"\b[a-f0-9]{40}\b", re.I)),
+    ("file-md5", re.compile(r"\b[a-f0-9]{32}\b", re.I)),
+)
+HASH_NAMES = {"file-sha256": "'SHA-256'", "file-sha1": "'SHA-1'", "file-md5": "MD5"}
 
 
 class NormalizationError(Exception):
@@ -25,7 +32,20 @@ class NormalizationError(Exception):
 
 
 def extract_observable(text: str) -> tuple[str, str]:
-    """Retourne (type STIX, valeur) : une IPv4 valide, sinon un domaine."""
+    """Retourne (type, valeur). Ordre : IP exacte, URL, hash, IPv4 dans le texte, domaine."""
+    t = text.strip()
+    try:                                       # le contenu est une IP seule (v4 ou v6)
+        ip = ipaddress.ip_address(t)
+        return ("ipv6-addr" if ip.version == 6 else "ipv4-addr"), str(ip)
+    except ValueError:
+        pass
+    m = URL_RE.search(text)
+    if m:
+        return "url", m.group()
+    for kind, rx in HASH_RES:
+        m = rx.search(text)
+        if m:
+            return kind, m.group().lower()
     for m in IP_RE.finditer(text):
         try:
             ip = ipaddress.ip_address(m.group())
@@ -35,7 +55,15 @@ def extract_observable(text: str) -> tuple[str, str]:
     m = DOMAIN_RE.search(text)
     if m:
         return "domain-name", m.group().lower()
-    raise NormalizationError("aucun indicateur (IP ou domaine) trouvé")
+    raise NormalizationError("aucun indicateur (IP, domaine, URL ou hash) trouvé")
+
+
+def build_pattern(kind: str, value: str) -> str:
+    """Motif STIX 2.1 ; les valeurs sont échappées pour ne jamais casser le motif."""
+    safe = value.replace("\\", "\\\\").replace("'", "\\'")
+    if kind in HASH_NAMES:
+        return f"[file:hashes.{HASH_NAMES[kind]} = '{safe}']"
+    return f"[{kind}:value = '{safe}']"
 
 
 def normalize(raw: dict, ref: str):
@@ -51,7 +79,7 @@ def normalize(raw: dict, ref: str):
     indicator = stix2.Indicator(
         name=f"{kind} : {value}",
         description=raw["content"],
-        pattern=f"[{kind}:value = '{value}']",
+        pattern=build_pattern(kind, value),
         pattern_type="stix",
     )
     rec = make_record(
